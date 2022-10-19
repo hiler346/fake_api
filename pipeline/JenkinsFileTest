@@ -1,0 +1,60 @@
+pipeline {
+  agent any
+// Указать сколько сборок будет хранить
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '50'))
+  }
+// Указать версию Gradle например Gradle 6.4.5
+  tools {
+    gradle 'Gradle'
+  }
+// Указать время
+  triggers {
+    cron('0 */4 * * *')
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+       git branch: 'master',
+        credentialsId: 'Указать креду',
+        url: 'Указать URL GIT'
+      }
+    }
+
+// Указать TEG с build.gradle
+    stage('Build') {
+      steps {
+        sh 'gradle clean test_env'
+      }
+    }
+  }
+
+  post {
+    success {
+      ansiColor('xterm') {
+        echo "Тесты среде TEST прошли успешно"
+      }
+    }
+
+    failure {
+      ansiColor('vga') {
+        echo "Тесты на среде TEST прошли не успешно"
+      }
+
+      script {
+        allure([
+          includeProperties: false,
+          jdk              : '',
+          properties       : [],
+          reportBuildPolicy: 'ALWAYS',
+          results          : [[path: 'build/allure-results']]
+        ])
+      }
+// Указать ссылку на телеграм бот и сообщение
+      sh  ("""
+        curl -s -X POST В данном месте должна быть ссылка на телеграм API -d text="🛑Тесты(TEST)\n📍→Pipeline: ${JOB_BASE_NAME}\n📍→Среда: Указать среду\n📍→Сcылка на allure: ${BUILD_URL}allure/"
+      """)
+    }
+  }
+}
